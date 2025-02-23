@@ -1,26 +1,77 @@
-# Node
+# Node.js dependencies
 node_modules/
 npm-debug.log
 yarn-debug.log
 yarn-error.log
 
-# Environment
+# Environment variables and secrets
 .env
 .env.local
-.env.*.local
+.env.development
+.env.test
+.env.production
 
-# Session files
+# WhatsApp session files
+auth_info_baileys/
 sessions/
 *.json
 !package.json
 !package-lock.json
+!app.json
+!tsconfig.json
 
-# OS
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
 
 # IDE
 .idea/
 .vscode/
-*.swp
-*.swo
+*.sublime-workspace
+*.sublime-project
+
+# Build files
+dist/
+build/
+coverage/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Media files
+*.mp3
+*.mp4
+*.wav
+*.ogg
+*.webm
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+
+# Database
+*.sqlite
+*.db
+database.json
+bans.json
+settings.json
+
+# Debug files
+debug/
+.debug/
+
+# Replit specific
+.replit
+replit.nix
+.breakpoints
+.upm/

@@ -1,0 +1,65 @@
+{
+  "name": "WhatsApp Bot",
+  "description": "A WhatsApp Bot with session management and command handling",
+  "repository": "https://github.com/yourusername/your-repo",
+  "keywords": ["node", "whatsapp", "bot", "session-management"],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment for the application",
+      "value": "production"
+    },
+    "SESSION_ID": {
+      "description": "Unique identifier for WhatsApp session",
+      "generator": "secret"
+    },
+    "MEGA_EMAIL": {
+      "description": "Mega.nz account email for session storage",
+      "required": true
+    },
+    "MEGA_PASSWORD": {
+      "description": "Mega.nz account password for session storage",
+      "required": true
+    },
+    "SESSION_FOLDER": {
+      "description": "Folder name in Mega storage for sessions",
+      "value": "whatsapp_sessions"
+    },
+    "SESSION_EXPIRY": {
+      "description": "Session expiry time in hours",
+      "value": "168"
+    },
+    "ENABLE_SESSION_DEBUG": {
+      "description": "Enable debug logging for session management",
+      "value": "false"
+    },
+    "OWNER_NUMBER": {
+      "description": "WhatsApp number of the bot owner (with country code)",
+      "required": true
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "eco"
+    },
+    "worker": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "success_url": "/health",
+  "scripts": {
+    "postdeploy": "node scripts/init-session.js"
+  },
+  "addons": [
+    {
+      "plan": "scheduler:standard",
+      "as": "SESSION_CLEANUP"
+    }
+  ]
+}

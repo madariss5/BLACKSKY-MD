@@ -54,3 +54,7 @@ run = ["sh", "-c", "rm -rf sessions && mkdir sessions && node index.js"]
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000

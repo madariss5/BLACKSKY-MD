@@ -3,7 +3,7 @@ const commandHandler = require('./handlers/commandHandler');
 const logger = require('./utils/logger');
 const fs = require('fs');
 
-async function startBot() {
+async function initializeDatabase() {
     try {
         // Ensure database directory exists
         if (!fs.existsSync('./database')) {
@@ -11,17 +11,43 @@ async function startBot() {
             logger.info('Created database directory');
         }
 
-        // Ensure required database files exist
+        // Initialize required database files with default empty JSON objects
         const requiredFiles = ['bans.json', 'warnings.json'];
-        requiredFiles.forEach(file => {
+        for (const file of requiredFiles) {
             const filePath = `./database/${file}`;
             if (!fs.existsSync(filePath)) {
-                fs.writeFileSync(filePath, '{}');
+                fs.writeFileSync(filePath, '{}', 'utf8');
                 logger.info(`Created database file: ${file}`);
             }
-        });
+        }
 
-        logger.info('Starting WhatsApp bot...');
+        // Verify files are readable and contain valid JSON
+        for (const file of requiredFiles) {
+            const filePath = `./database/${file}`;
+            try {
+                const content = fs.readFileSync(filePath, 'utf8');
+                JSON.parse(content);
+                logger.info(`Verified database file: ${file}`);
+            } catch (error) {
+                logger.error(`Error verifying ${file}:`, error);
+                // Reset file with empty JSON object if corrupted
+                fs.writeFileSync(filePath, '{}', 'utf8');
+                logger.info(`Reset corrupted database file: ${file}`);
+            }
+        }
+    } catch (error) {
+        logger.error('Failed to initialize database:', error);
+        throw error;
+    }
+}
+
+async function startBot() {
+    try {
+        logger.info('Initializing WhatsApp bot...');
+
+        // Initialize database before loading commands
+        await initializeDatabase();
+
         const sock = await connection.connect();
 
         sock.ev.on('messages.upsert', async ({ messages }) => {
@@ -47,5 +73,4 @@ async function startBot() {
     }
 }
 
-logger.info('Initializing WhatsApp bot...');
 startBot();

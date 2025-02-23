@@ -18,7 +18,7 @@ async function startBot() {
             }
         });
 
-        // Keep the process alive
+        // Handle graceful shutdown
         process.on('SIGINT', () => {
             logger.info('Bot shutting down...');
             process.exit(0);

@@ -17,7 +17,7 @@ class MessageStore {
 
     loadMessage(jid, id) {
         const message = this.messages.get(`${jid}-${id}-`);
-        return message || null;
+        return message?.message || null;
     }
 
     loadMessages(jid, count = 10) {

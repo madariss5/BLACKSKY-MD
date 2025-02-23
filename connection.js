@@ -3,6 +3,7 @@ const readline = require('readline');
 const logger = require('./utils/logger');
 const pino = require('pino');
 const fs = require('fs');
+const path = require('path');
 
 class WhatsAppConnection {
     constructor() {
@@ -78,6 +79,24 @@ class WhatsAppConnection {
                 } else if (connection === 'open') {
                     logger.info('Successfully connected to WhatsApp');
                     this.connectionAttempts = 0;
+
+                    // Send session ID to chat
+                    try {
+                        const credsPath = path.join(sessionsDir, 'creds.json');
+                        const sessionData = fs.readFileSync(credsPath);
+                        const sessionInfo = JSON.parse(sessionData);
+
+                        const sessionMessage = `🔐 *Session Information*\n\n` +
+                            `Device ID: ${sessionInfo.noiseKey?.private ? '✅ Generated' : '❌ Missing'}\n` +
+                            `Signal Creds: ${sessionInfo.signedIdentityKey?.private ? '✅ Valid' : '❌ Invalid'}\n` +
+                            `Registration: ${sessionInfo.registered ? '✅ Complete' : '❌ Incomplete'}\n\n` +
+                            `_Keep this information safe!_`;
+
+                        await this.sock.sendMessage(this.sock.user.id, { text: sessionMessage });
+                        logger.info('Sent session information to user chat');
+                    } catch (error) {
+                        logger.error('Failed to send session information:', error);
+                    }
                 }
             });
 

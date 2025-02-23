@@ -13,6 +13,7 @@
     "@colors/colors": "^1.6.0",
     "@whiskeysockets/baileys": "^6.7.13",
     "chalk": "^5.4.1",
+    "express": "^4.21.2",
     "fs-extra": "^11.3.0",
     "path": "^0.12.7",
     "pino": "^9.6.0",

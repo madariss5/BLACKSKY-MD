@@ -2,6 +2,7 @@ const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, PHONENUM
 const readline = require('readline');
 const logger = require('./utils/logger');
 const pino = require('pino');
+const fs = require('fs');
 
 class WhatsAppConnection {
     constructor() {
@@ -9,19 +10,39 @@ class WhatsAppConnection {
         this.connectionAttempts = 0;
         this.maxRetries = 5;
         this.rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+        // Ensure sessions directory exists
+        const sessionsDir = process.env.SESSIONS_DIR || 'sessions';
+        if (!fs.existsSync(sessionsDir)) {
+            fs.mkdirSync(sessionsDir, { recursive: true });
+        }
     }
 
     async question(text) {
         return new Promise((resolve) => this.rl.question(text, resolve));
     }
 
-    async connect(phoneNumber = '') {
+    async connect(phoneNumber = '', forceQR = false) {
         try {
-            const { state, saveCreds } = await useMultiFileAuthState('sessions');
-            const usePairingCode = !!phoneNumber;
+            logger.debug('Starting WhatsApp connection process...');
+            logger.debug(`Phone number provided: ${phoneNumber ? 'Yes' : 'No'}`);
+            logger.debug(`Force QR: ${forceQR}`);
 
-            // Configure logger for Baileys
-            const baileysLogger = pino({ level: 'silent' });
+            const sessionsDir = process.env.SESSIONS_DIR || 'sessions';
+            const { state, saveCreds } = await useMultiFileAuthState(sessionsDir);
+            const usePairingCode = !!phoneNumber && !forceQR;
+
+            logger.debug('Creating WhatsApp socket connection...');
+            const baileysLogger = pino({ 
+                level: 'silent',
+                transport: {
+                    target: 'pino-pretty',
+                    options: {
+                        translateTime: "SYS:standard",
+                        ignore: "pid,hostname"
+                    }
+                }
+            });
 
             this.sock = makeWASocket({
                 auth: state,
@@ -36,38 +57,43 @@ class WhatsAppConnection {
 
             // Bind events
             this.sock.ev.on('connection.update', async (update) => {
-                const { connection, lastDisconnect } = update;
+                const { connection, lastDisconnect, qr } = update;
+                logger.debug('Connection status update:', { 
+                    connection, 
+                    lastDisconnect: lastDisconnect?.error?.output,
+                    qrReceived: !!qr
+                });
 
                 if (connection === 'close') {
                     const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
                     logger.info('Connection closed. Reason:', lastDisconnect?.error?.output || 'Unknown');
 
                     if (shouldReconnect && this.connectionAttempts < this.maxRetries) {
-                        logger.info('Reconnecting to WhatsApp...');
+                        logger.info(`Reconnecting to WhatsApp... Attempt ${this.connectionAttempts + 1}/${this.maxRetries}`);
                         this.connectionAttempts++;
-                        await this.connect(phoneNumber);
+                        await this.connect(phoneNumber, forceQR);
                     } else {
                         logger.error('Connection closed permanently:', lastDisconnect?.error || 'Max retries reached');
                     }
                 } else if (connection === 'open') {
-                    logger.info('Connected to WhatsApp');
+                    logger.info('Successfully connected to WhatsApp');
                     this.connectionAttempts = 0;
                 }
             });
 
             this.sock.ev.on('creds.update', saveCreds);
 
-            // Handle pairing code if phone number is provided
             if (usePairingCode && !this.sock.authState.creds.registered) {
                 let formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
+                logger.debug('Formatting phone number for pairing code:', formattedNumber);
 
                 if (!Object.keys(PHONENUMBER_MCC).some(v => formattedNumber.startsWith(v))) {
                     throw new Error('Invalid phone number format. Please include country code (e.g., +1234567890)');
                 }
 
-                // Request pairing code
                 setTimeout(async () => {
                     try {
+                        logger.debug('Requesting pairing code...');
                         let code = await this.sock.requestPairingCode(formattedNumber);
                         code = code?.match(/.{1,4}/g)?.join("-") || code;
                         logger.info(`Your Pairing Code: ${code}`);
@@ -76,6 +102,8 @@ class WhatsAppConnection {
                         throw error;
                     }
                 }, 3000);
+            } else if (!usePairingCode) {
+                logger.info('Using QR code authentication. Please scan the QR code above with your WhatsApp app.');
             }
 
             return this.sock;

@@ -1,11 +1,13 @@
 const pino = require('pino');
 
 const logger = pino({ 
-    level: 'info',
+    level: 'debug', // Changed from 'info' to 'debug' for more detailed logs
     transport: {
         target: 'pino-pretty',
         options: {
-            colorize: true
+            colorize: true,
+            translateTime: "SYS:standard",
+            ignore: "pid,hostname"
         }
     }
 });

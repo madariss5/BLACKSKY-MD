@@ -9,8 +9,9 @@
       "value": "production"
     },
     "SESSION_ID": {
-      "description": "Unique identifier for WhatsApp session",
-      "generator": "secret"
+      "description": "Place your unique BLACKSKY-MD session ID here. This is required for the bot to function.",
+      "value": "",
+      "required": true
     },
     "MEGA_EMAIL": {
       "description": "Mega.nz account email for session storage",

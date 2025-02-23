@@ -48,6 +48,17 @@ async function startBot() {
                 res.send('WhatsApp Bot is running!');
             });
 
+            // Add health check endpoint
+            app.get('/health', (req, res) => {
+                const status = {
+                    service: 'WhatsApp Bot',
+                    status: 'OK',
+                    timestamp: new Date().toISOString(),
+                    connection: sock.ws.readyState === sock.ws.OPEN ? 'Connected' : 'Disconnected'
+                };
+                res.json(status);
+            });
+
             app.listen(port, '0.0.0.0', () => {
                 logger.info(`Server is running on port ${port}`);
             });

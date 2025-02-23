@@ -11,18 +11,27 @@ class CommandHandler {
     }
 
     loadCommands() {
-        const commandFiles = fs.readdirSync(path.join(__dirname, '../commands'))
-            .filter(file => file.endsWith('.js'));
+        // Load commands from various directories
+        const commandDirs = ['commands', 'commands/menus', 'commands/owner', 'commands/admin'];
 
-        for (const file of commandFiles) {
-            try {
-                const command = require(`../commands/${file}`);
-                this.commands.set(command.name, command);
-                logger.info(`Loaded command: ${command.name}`);
-            } catch (error) {
-                logger.error(`Failed to load command from ${file}:`, error);
+        commandDirs.forEach(dir => {
+            const dirPath = path.join(__dirname, '..', dir);
+            if (fs.existsSync(dirPath)) {
+                const commandFiles = fs.readdirSync(dirPath)
+                    .filter(file => file.endsWith('.js'));
+
+                logger.info(`Loading commands from ${dir}...`);
+                for (const file of commandFiles) {
+                    try {
+                        const command = require(path.join(dirPath, file));
+                        this.commands.set(command.name, command);
+                        logger.info(`Loaded command: ${command.name}`);
+                    } catch (error) {
+                        logger.error(`Failed to load command from ${file}:`, error);
+                    }
+                }
             }
-        }
+        });
     }
 
     getCommands() {

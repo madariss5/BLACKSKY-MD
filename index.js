@@ -1,9 +1,26 @@
 const connection = require('./connection');
 const commandHandler = require('./handlers/commandHandler');
 const logger = require('./utils/logger');
+const fs = require('fs');
 
 async function startBot() {
     try {
+        // Ensure database directory exists
+        if (!fs.existsSync('./database')) {
+            fs.mkdirSync('./database');
+            logger.info('Created database directory');
+        }
+
+        // Ensure required database files exist
+        const requiredFiles = ['bans.json', 'warnings.json'];
+        requiredFiles.forEach(file => {
+            const filePath = `./database/${file}`;
+            if (!fs.existsSync(filePath)) {
+                fs.writeFileSync(filePath, '{}');
+                logger.info(`Created database file: ${file}`);
+            }
+        });
+
         logger.info('Starting WhatsApp bot...');
         const sock = await connection.connect();
 

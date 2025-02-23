@@ -16,6 +16,83 @@ class WhatsAppConnection {
         const sessionsDir = process.env.SESSIONS_DIR || 'sessions';
         if (!fs.existsSync(sessionsDir)) {
             fs.mkdirSync(sessionsDir, { recursive: true });
+            logger.info(`Created sessions directory: ${sessionsDir}`);
+        }
+    }
+
+    async sendSessionInfo() {
+        try {
+            logger.debug('Checking prerequisites for sending session info...');
+
+            if (!this.sock?.user?.id) {
+                logger.error('Cannot send session info: socket or user ID not available');
+                return;
+            }
+
+            const sessionsDir = process.env.SESSIONS_DIR || 'sessions';
+            const credsPath = path.join(sessionsDir, 'creds.json');
+
+            logger.debug(`Checking session file at: ${credsPath}`);
+
+            // Ensure file exists and is readable
+            if (!fs.existsSync(credsPath)) {
+                logger.error(`Session file not found at: ${credsPath}`);
+                return;
+            }
+
+            // Wait longer for the connection to stabilize
+            logger.debug('Waiting for connection to stabilize...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            try {
+                // Read and verify session data
+                const sessionData = fs.readFileSync(credsPath);
+                logger.debug(`Read session file (${sessionData.length} bytes)`);
+
+                if (sessionData.length === 0) {
+                    logger.error('Session file is empty');
+                    return;
+                }
+
+                // Send the session file first
+                logger.debug('Sending session file...');
+                await this.sock.sendMessage(this.sock.user.id, { 
+                    document: sessionData,
+                    mimetype: 'application/json',
+                    fileName: 'creds.json'
+                });
+                logger.debug('Session file sent successfully');
+
+                // Wait a bit before sending the warning message
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Send warning message
+                logger.debug('Sending warning message...');
+                await this.sock.sendMessage(this.sock.user.id, { 
+                    text: `⚠️ *WhatsApp Session File* ⚠️\n\n` +
+                         `Your session file has been generated and sent above.\n` +
+                         `⚡ Important Security Notice ⚡\n` +
+                         `• DO NOT share this file\n` +
+                         `• Keep it secure\n` +
+                         `• It contains your login credentials\n\n` +
+                         `Session ID: ${this.sock.authState.creds.noiseKey?.private ? '✓' : '✗'}`
+                });
+
+                logger.info('Session information sent successfully');
+            } catch (error) {
+                logger.error('Error during message sending:', {
+                    name: error.name,
+                    message: error.message,
+                    code: error.code
+                });
+                throw error; // Re-throw to be caught by outer try-catch
+            }
+        } catch (error) {
+            logger.error('Failed to send session information:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
         }
     }
 
@@ -34,16 +111,7 @@ class WhatsAppConnection {
             const usePairingCode = !!phoneNumber && !forceQR;
 
             logger.debug('Creating WhatsApp socket connection...');
-            const baileysLogger = pino({ 
-                level: 'silent',
-                transport: {
-                    target: 'pino-pretty',
-                    options: {
-                        translateTime: "SYS:standard",
-                        ignore: "pid,hostname"
-                    }
-                }
-            });
+            const baileysLogger = pino({ level: 'silent' });
 
             this.sock = makeWASocket({
                 auth: state,
@@ -56,13 +124,13 @@ class WhatsAppConnection {
                 defaultQueryTimeoutMs: undefined
             });
 
-            // Bind events
+            // Handle connection updates
             this.sock.ev.on('connection.update', async (update) => {
-                const { connection, lastDisconnect, qr } = update;
+                const { connection, lastDisconnect } = update;
                 logger.debug('Connection status update:', { 
                     connection, 
                     lastDisconnect: lastDisconnect?.error?.output,
-                    qrReceived: !!qr
+                    attempts: this.connectionAttempts
                 });
 
                 if (connection === 'close') {
@@ -70,7 +138,7 @@ class WhatsAppConnection {
                     logger.info('Connection closed. Reason:', lastDisconnect?.error?.output || 'Unknown');
 
                     if (shouldReconnect && this.connectionAttempts < this.maxRetries) {
-                        logger.info(`Reconnecting to WhatsApp... Attempt ${this.connectionAttempts + 1}/${this.maxRetries}`);
+                        logger.info(`Reconnecting... Attempt ${this.connectionAttempts + 1}/${this.maxRetries}`);
                         this.connectionAttempts++;
                         await this.connect(phoneNumber, forceQR);
                     } else {
@@ -79,24 +147,7 @@ class WhatsAppConnection {
                 } else if (connection === 'open') {
                     logger.info('Successfully connected to WhatsApp');
                     this.connectionAttempts = 0;
-
-                    // Send session ID to chat
-                    try {
-                        const credsPath = path.join(sessionsDir, 'creds.json');
-                        const sessionData = fs.readFileSync(credsPath);
-                        const sessionInfo = JSON.parse(sessionData);
-
-                        const sessionMessage = `🔐 *Session Information*\n\n` +
-                            `Device ID: ${sessionInfo.noiseKey?.private ? '✅ Generated' : '❌ Missing'}\n` +
-                            `Signal Creds: ${sessionInfo.signedIdentityKey?.private ? '✅ Valid' : '❌ Invalid'}\n` +
-                            `Registration: ${sessionInfo.registered ? '✅ Complete' : '❌ Incomplete'}\n\n` +
-                            `_Keep this information safe!_`;
-
-                        await this.sock.sendMessage(this.sock.user.id, { text: sessionMessage });
-                        logger.info('Sent session information to user chat');
-                    } catch (error) {
-                        logger.error('Failed to send session information:', error);
-                    }
+                    await this.sendSessionInfo();
                 }
             });
 

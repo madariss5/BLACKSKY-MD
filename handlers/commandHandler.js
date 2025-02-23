@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../config');
 const logger = require('../utils/logger');
+const lang = require('../utils/languageHandler');
 
 class CommandHandler {
     constructor() {
@@ -69,7 +70,7 @@ class CommandHandler {
                 if (Date.now() < cooldownExpiry) {
                     const remainingTime = Math.ceil((cooldownExpiry - Date.now()) / 1000);
                     await sock.sendMessage(msg.key.remoteJid, { 
-                        text: `Please wait ${remainingTime} seconds before using this command again.` 
+                        text: lang.getText('errors.cooldown', config.language, { time: remainingTime })
                     });
                     return;
                 }
@@ -89,7 +90,7 @@ class CommandHandler {
             } catch (error) {
                 logger.error(`Error executing command ${commandName}:`, error);
                 await sock.sendMessage(msg.key.remoteJid, { 
-                    text: 'There was an error executing that command.' 
+                    text: lang.getText('errors.generalError', config.language)
                 });
             }
         }

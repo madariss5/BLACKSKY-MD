@@ -5,10 +5,12 @@ const config = {
     // Bot configuration
     prefix: '!',
     ownerNumber: '1234567890@s.whatsapp.net', // Change this to your number
-    
+    language: 'de', // Default language
+    availableLanguages: ['en', 'de'], // Available languages
+
     // Command settings
     commandCooldown: 3000, // 3 seconds
-    
+
     // Database operations
     saveData: (key, value) => {
         try {
@@ -19,7 +21,7 @@ const config = {
             return false;
         }
     },
-    
+
     getData: (key) => {
         try {
             return db.get(key);
@@ -27,6 +29,21 @@ const config = {
             console.error('Database read error:', error);
             return null;
         }
+    },
+
+    // Language settings
+    setLanguage: (lang) => {
+        if (config.availableLanguages.includes(lang)) {
+            config.language = lang;
+            config.saveData('language', lang);
+            return true;
+        }
+        return false;
+    },
+
+    getLanguage: () => {
+        const savedLang = config.getData('language');
+        return savedLang || config.language;
     }
 };
 

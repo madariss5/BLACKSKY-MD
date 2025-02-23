@@ -2,6 +2,7 @@ const connection = require('./connection');
 const commandHandler = require('./handlers/commandHandler');
 const logger = require('./utils/logger');
 const fs = require('fs');
+const lang = require('./utils/languageHandler'); // Added languageHandler import
 
 async function initializeDatabase() {
     try {
@@ -47,6 +48,12 @@ async function startBot() {
 
         // Initialize database before loading commands
         await initializeDatabase();
+
+        // Initialize language system  //Added language initialization
+        const savedLanguage = config.getLanguage(); // Assumes config module exists
+        lang.setDefaultLanguage(savedLanguage);
+        logger.info(`Initialized with language: ${savedLanguage}`);
+
 
         const sock = await connection.connect();
 

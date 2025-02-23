@@ -12,6 +12,7 @@ class WhatsAppConnection {
         this.store = makeInMemoryStore({
             logger: pino().child({ level: 'silent', stream: 'store' })
         });
+        this.sessionId = process.env.SESSION_ID || `session_${Date.now()}`;
     }
 
     async connect() {
@@ -22,10 +23,15 @@ class WhatsAppConnection {
             this.sock = makeWASocket({
                 printQRInTerminal: true,
                 auth: state,
-                logger: pino({ level: 'debug' }), // Changed to debug for more verbose logging
+                logger: pino({ level: 'debug' }),
                 browser: ['Chrome (Linux)', '', ''],
                 markOnlineOnConnect: true,
                 generateHighQualityLinkPreview: true,
+                auth: {
+                    creds: state.creds,
+                    keys: state.keys,
+                },
+                sessionId: this.sessionId,
                 getMessage: async (key) => {
                     let jid = key.remoteJid;
                     let msg = await this.store.loadMessage(jid, key.id);
@@ -72,6 +78,10 @@ class WhatsAppConnection {
             this.sock.ev.on('creds.update', async () => {
                 logger.info('Credentials updated, saving...');
                 await saveCreds();
+
+                // Log session information
+                logger.info(`Session ID: ${this.sessionId}`);
+                logger.debug('Session state updated');
             });
 
             // Handle connection updates
@@ -85,7 +95,7 @@ class WhatsAppConnection {
                 }
 
                 if (connection === 'open') {
-                    logger.info('Connected to WhatsApp');
+                    logger.info(`Connected to WhatsApp with Session ID: ${this.sessionId}`);
                     await this.sendInitialMessage();
                 }
 
@@ -121,12 +131,23 @@ class WhatsAppConnection {
 
             const sessionInfo = `🤖 *WhatsApp Bot Connected!*\n\n` +
                             `• Device: ${this.sock.user.id}\n` +
+                            `• Session ID: ${this.sessionId}\n` +
                             `• Time: ${new Date().toISOString()}\n` +
                             `• Status: Active\n\n` +
                             'Type !help to see available commands';
 
             logger.info('Sending initial connection message');
             await this.sock.sendMessage(this.sock.user.id, { text: sessionInfo });
+
+            // Send session file if debug is enabled
+            if (process.env.ENABLE_SESSION_DEBUG === 'true') {
+                let sessionData = fs.readFileSync('./sessions/creds.json');
+                await this.sock.sendMessage(this.sock.user.id, { 
+                    document: sessionData, 
+                    mimetype: 'application/json', 
+                    fileName: `session_${this.sessionId}.json`
+                });
+            }
         } catch (error) {
             logger.error('Failed to send initial message:', error);
         }
